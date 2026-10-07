@@ -39,6 +39,7 @@ public class PrimaryController {
     @FXML private Label dictionaryLabel, modeLabel, homeStatus;
     @FXML private Button resumeButton;
     private final GameSettings settings = new GameSettings();
+    private SoundManager soundManager;
     private boolean practiceRound;
     private Button enterButton;
     private double dragX, dragY;
@@ -60,6 +61,7 @@ public class PrimaryController {
     private char[] entry;
 
     @FXML private void initialize() {
+        soundManager = new SoundManager(settings.sound(), settings.music());
         for (int i = 1; i <= Levels.ALL.size(); i++) homeLevel.getItems().add("Level " + i);
         homeLevel.getSelectionModel().selectFirst();
         buildKeyboard();
@@ -106,16 +108,21 @@ public class PrimaryController {
         });
         Platform.runLater(this::drawHero);
         syncSeaMotion();
+        soundManager.playMenuMusic();
     }
     @FXML private void showHome() {
+        soundManager.playSfx(SoundManager.Sfx.BUTTON_1);
         cancelLookup();
         show(homePane);
         resumeButton.setDisable(game == null || game.outcome() != Outcome.PLAYING);
         updateHomeStatus();
+        soundManager.playMenuMusic();
     }
     @FXML private void resumeGame() {
         if (game == null || game.outcome() != Outcome.PLAYING) return;
+        soundManager.playSfx(SoundManager.Sfx.START_VOYAGE);
         show(gamePane); entryChanged(); render();
+        soundManager.playGameMusic();
     }
     private void updateModeLabel() {
         modeLabel.setText(settings.online() ? "DICTIONARY ON" : "OFFLINE PRACTICE");
@@ -126,6 +133,7 @@ public class PrimaryController {
             + "% · " + (settings.online() ? "Dictionary mode" : "Offline practice"));
     }
     @FXML private void showSettings() {
+        soundManager.playSfx(SoundManager.Sfx.BUTTON_1);
         Dialog<ButtonType> dialog = new Dialog<>();
         dialog.initOwner(App.window()); dialog.setTitle("Ship settings");
         dialog.setHeaderText("Choose how ye sail");
@@ -136,7 +144,11 @@ public class PrimaryController {
             + "Switching modes keeps your current letters and attempts.", "muted");
         CheckBox motion = new CheckBox("Animate sea and sharks");
         motion.setSelected(settings.motion());
-        VBox content = new VBox(16, online, explanation, motion);
+        CheckBox sound = new CheckBox("Play sound effects");
+        sound.setSelected(settings.sound());
+        CheckBox music = new CheckBox("Play background music");
+        music.setSelected(settings.music());
+        VBox content = new VBox(14, online, explanation, motion, sound, music);
         content.setPadding(new javafx.geometry.Insets(18));
         dialog.getDialogPane().setContent(content);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.APPLY, ButtonType.CANCEL);
@@ -144,7 +156,9 @@ public class PrimaryController {
         dialog.getDialogPane().setPrefWidth(540);
         if (dialog.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.APPLY) {
             cancelLookup();
-            settings.set(online.isSelected(), motion.isSelected());
+            settings.set(online.isSelected(), motion.isSelected(), sound.isSelected(), music.isSelected());
+            soundManager.setSoundEnabled(settings.sound());
+            soundManager.setMusicEnabled(settings.music());
             if (!settings.motion()) resetEffects();
             boolean saved = settings.flush();
             if (game != null && game.outcome() == Outcome.PLAYING) {
@@ -161,6 +175,7 @@ public class PrimaryController {
     }
     @FXML private void closeApp() {
         cancelLookup();
+        soundManager.stopMusic();
         Platform.exit();
     }
     @FXML private void startGame() { begin(homeLevel.getSelectionModel().getSelectedIndex()); }
@@ -169,7 +184,11 @@ public class PrimaryController {
         if (levelIndex + 1 < Levels.ALL.size()) begin(levelIndex + 1);
         else showHome();
     }
-    @FXML private void reviewGame() { show(gamePane); render(); }
+    @FXML private void reviewGame() {
+        soundManager.playSfx(SoundManager.Sfx.BUTTON_1);
+        show(gamePane); render();
+        soundManager.playGameMusic();
+    }
     private void begin(int index) {
         levelIndex = index;
         practiceRound = !settings.online();
@@ -178,6 +197,8 @@ public class PrimaryController {
         threatA.set(0); threatB.set(0);
         resetEffects();
         resetEntry(); show(gamePane); entryChanged();
+        soundManager.playSfx(SoundManager.Sfx.START_VOYAGE);
+        soundManager.playGameMusic();
         messageLabel.setText("Start with A. Watch the gold anchor tile — a green match there can save the junction.");
         render();
     }
@@ -196,12 +217,14 @@ public class PrimaryController {
     }
     private void type(char letter) {
         if (!canType()) return;
+        soundManager.playSfx(SoundManager.Sfx.BUTTON_1);
         for (int i = 0; i < entry.length; i++) if (!locked(i) && entry[i] == 0) {
             entry[i] = letter; entryChanged(); return;
         }
     }
     private void erase() {
         if (!canType()) return;
+        soundManager.playSfx(SoundManager.Sfx.BUTTON_2);
         for (int i = entry.length - 1; i >= 0; i--) if (!locked(i) && entry[i] != 0) {
             entry[i] = 0; entryChanged(); return;
         }
@@ -221,6 +244,11 @@ public class PrimaryController {
             if (game.outcome() != Outcome.PLAYING) {
                 messageLabel.setText("Level finished. Use Home to pick a level, or Restart to try again.");
                 render(); showResult(); return;
+            }
+            if (correctGuess) {
+                soundManager.playSfx(SoundManager.Sfx.RIGHT_WORD);
+            } else {
+                soundManager.playSfx(SoundManager.Sfx.WRONG_WORD);
             }
             if (!wasSecond && game.isSecond()) {
                 messageLabel.setText(game.solved(false)
@@ -354,13 +382,17 @@ public class PrimaryController {
         });
         debounce.playFromStart();
     }
-    @FXML private void retryWord() { if (canType()) entryChanged(); }
+    @FXML private void retryWord() {
+        soundManager.playSfx(SoundManager.Sfx.BUTTON_1);
+        if (canType()) entryChanged();
+    }
     private void updateEnter() {
         if (enterButton != null) enterButton.setDisable(!canType()
             || validation != DictionaryService.Result.VALID || !new String(entry).equals(approvedWord));
     }
     @FXML private void showHint() {
         if (!canType()) return;
+        soundManager.playSfx(SoundManager.Sfx.BUTTON_1);
         showDialog("Captain's hint", "Word " + (game.isSecond() ? "B / DOWN" : "A / ACROSS")
             + " · " + entry.length + " letters", PirateHints.forWord(game.target())
             + "\n\nThis hint is free. No attempts or points lost!");
@@ -441,6 +473,12 @@ public class PrimaryController {
         updateEnter();
     }
     private void showResult() {
+        soundManager.stopMusic();
+        if (game.outcome() == Outcome.FULL_VICTORY || game.outcome() == Outcome.PARTIAL_SURVIVAL || game.outcome() == Outcome.SURVIVAL_CLEAR) {
+            soundManager.playSfx(SoundManager.Sfx.WIN);
+        } else {
+            soundManager.playSfx(SoundManager.Sfx.LOSE);
+        }
         settings.record(levelIndex, practiceRound, game.score());
         boolean scoreSaved = settings.flush();
         String title, detail;
@@ -458,6 +496,7 @@ public class PrimaryController {
         show(resultPane);
     }
     @FXML private void showHelp() {
+        soundManager.playSfx(SoundManager.Sfx.BUTTON_1);
         showDialog("How to play", "Save the words. Protect the anchor.",
             "Type directly onto the highlighted raft: A across, then B down.\n\n"
             + "Green = correct spot. Gold = elsewhere. Gray = no match.\n\n"

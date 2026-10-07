@@ -11,6 +11,24 @@ The updated Java 11 / JavaFX 13 project. This is the complete project, not the e
 On Windows you can instead double-click `START-GAME.bat` if JDK 11+ and Maven are already on your PATH.
 The first build needs internet to download JavaFX/Maven dependencies. After those are cached, the game can run offline; if Maven tries to connect, run `mvn -o javafx:run`. Offline gameplay does not eliminate that initial installation requirement. Your original POM versions are retained.
 
+## Audio and sound effects update
+
+- **Sound effects (SFX)**:
+  - `Button1.wav`: Letter typing (onscreen & physical keys), navigation, and dialog buttons.
+  - `Button2.wav`: Letter deletion and erase actions (Backspace / DEL).
+  - `StartVoyage1.wav`: Embarking on a level, restarting, or resuming a voyage.
+  - `RightWord-BuildRaft1.mp3`: Solving Word A / celebratory raft bounce.
+  - `WrongWord-SharkMove1.wav`: Incorrect guess feedback and shark advance.
+  - `Win1.wav`: Full victory / stage completion jingle.
+  - `Lose1.wav`: Sink / game over sound.
+- **Background music (BGM)**:
+  - `MenuMusic1.mp3`: Looping ocean pirate theme on the Home screen.
+  - `GameMusic1.wav` & `GameMusic2.wav`: Looping in-game adventure voyage tracks.
+- **Audio controls**:
+  - Settings dialog provides independent toggles for **Play sound effects** and **Play background music**, saved locally via Java Preferences.
+- **Fault-tolerant design**:
+  - `SoundManager.java` handles playback gracefully with try/catch boundaries so that unavailable audio hardware or missing audio drivers never cause game crashes.
+
 ## Shark and animation update
 
 - Replaced the tiny fish-shaped sprite with an original 48 × 24 shark: tall swept dorsal fin, asymmetrical tail, pointed snout, gills, pale belly and prominent pectoral fin. At the same pixel scale it is roughly twice the old width/height.
